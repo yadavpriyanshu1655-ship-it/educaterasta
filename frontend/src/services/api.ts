@@ -14,6 +14,16 @@ import {
   ExamUpdateInput,
   DashboardSummary,
   AnalyticsOverview,
+  StudyPreference,
+  StudyPreferenceUpdateInput,
+  UnavailableBlock,
+  UnavailableBlockCreateInput,
+  ScheduleHistory,
+  GeneratedPlanResponse,
+  PlanGenerateRequestInput,
+  ConfirmPlanRequestInput,
+  RecoverMissedRequestInput,
+  RecoverMissedResponse,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
@@ -200,3 +210,80 @@ export async function deleteExam(id: number): Promise<void> {
   return handleResponse<void>(res);
 }
 
+// --- Intelligent Scheduling Engine (Phase 02) ---
+
+export async function getStudyPreferences(): Promise<StudyPreference> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/planner/preferences`);
+  return handleResponse<StudyPreference>(res);
+}
+
+export async function updateStudyPreferences(input: StudyPreferenceUpdateInput): Promise<StudyPreference> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/planner/preferences`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  return handleResponse<StudyPreference>(res);
+}
+
+export async function getUnavailableBlocks(): Promise<UnavailableBlock[]> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/planner/unavailable-blocks`);
+  return handleResponse<UnavailableBlock[]>(res);
+}
+
+export async function createUnavailableBlock(input: UnavailableBlockCreateInput): Promise<UnavailableBlock> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/planner/unavailable-blocks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  return handleResponse<UnavailableBlock>(res);
+}
+
+export async function deleteUnavailableBlock(id: number): Promise<void> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/planner/unavailable-blocks/${id}`, {
+    method: 'DELETE',
+  });
+  return handleResponse<void>(res);
+}
+
+export async function getScheduleHistory(limit: number = 20): Promise<ScheduleHistory[]> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/planner/history?limit=${limit}`);
+  return handleResponse<ScheduleHistory[]>(res);
+}
+
+export async function generateStudyPlan(input: PlanGenerateRequestInput): Promise<GeneratedPlanResponse> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/planner/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  return handleResponse<GeneratedPlanResponse>(res);
+}
+
+export async function previewReschedule(input: PlanGenerateRequestInput): Promise<GeneratedPlanResponse> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/planner/preview-reschedule`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  return handleResponse<GeneratedPlanResponse>(res);
+}
+
+export async function confirmStudyPlan(input: ConfirmPlanRequestInput): Promise<{ status: string; message: string; sessions_created: number }> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/planner/confirm-plan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  return handleResponse<{ status: string; message: string; sessions_created: number }>(res);
+}
+
+export async function recoverMissedSessions(input: RecoverMissedRequestInput): Promise<RecoverMissedResponse> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/planner/recover-missed`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  return handleResponse<RecoverMissedResponse>(res);
+}

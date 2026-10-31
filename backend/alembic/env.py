@@ -14,7 +14,15 @@ if BASE_DIR not in sys.path:
 
 from backend.app.core.config import settings
 from backend.app.core.database import Base
-from backend.app.models import Subject, Topic, StudySession, Exam
+from backend.app.models import (
+    Subject,
+    Topic,
+    StudySession,
+    Exam,
+    StudyPreference,
+    UnavailableBlock,
+    ScheduleHistory,
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

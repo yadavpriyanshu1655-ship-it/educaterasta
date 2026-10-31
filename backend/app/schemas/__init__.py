@@ -5,6 +5,23 @@ from backend.app.schemas.study_session import StudySessionCreate, StudySessionUp
 from backend.app.schemas.exam import ExamCreate, ExamUpdate, ExamResponse
 from backend.app.schemas.dashboard import DashboardSummary, SubjectProgressSummary
 from backend.app.schemas.analytics import AnalyticsOverview
+from backend.app.schemas.planner import (
+    StudyPreferenceBase,
+    StudyPreferenceUpdate,
+    StudyPreferenceResponse,
+    UnavailableBlockBase,
+    UnavailableBlockCreate,
+    UnavailableBlockResponse,
+    ScheduleHistoryResponse,
+    PlanGenerateRequest,
+    ProposedSession,
+    UnscheduledTask,
+    DailyWorkload,
+    GeneratedPlanResponse,
+    ConfirmPlanRequest,
+    RecoverMissedRequest,
+    RecoverMissedResponse,
+)
 
 __all__ = [
     "HealthCheckResponse",
@@ -24,4 +41,19 @@ __all__ = [
     "DashboardSummary",
     "SubjectProgressSummary",
     "AnalyticsOverview",
+    "StudyPreferenceBase",
+    "StudyPreferenceUpdate",
+    "StudyPreferenceResponse",
+    "UnavailableBlockBase",
+    "UnavailableBlockCreate",
+    "UnavailableBlockResponse",
+    "ScheduleHistoryResponse",
+    "PlanGenerateRequest",
+    "ProposedSession",
+    "UnscheduledTask",
+    "DailyWorkload",
+    "GeneratedPlanResponse",
+    "ConfirmPlanRequest",
+    "RecoverMissedRequest",
+    "RecoverMissedResponse",
 ]

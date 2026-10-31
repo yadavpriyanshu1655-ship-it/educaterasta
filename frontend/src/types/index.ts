@@ -183,3 +183,133 @@ export interface AnalyticsOverview {
   priority_distribution: Record<string, number>;
 }
 
+// --- Phase 02 Intelligent Scheduling Engine Types ---
+
+export interface StudyPreference {
+  id: number;
+  daily_target_hours: number;
+  preferred_start_time: string;
+  preferred_end_time: string;
+  max_session_duration_minutes: number;
+  break_duration_minutes: number;
+  available_days: string;
+  exam_survival_mode: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StudyPreferenceUpdateInput {
+  daily_target_hours?: number;
+  preferred_start_time?: string;
+  preferred_end_time?: string;
+  max_session_duration_minutes?: number;
+  break_duration_minutes?: number;
+  available_days?: string;
+  exam_survival_mode?: boolean;
+}
+
+export interface UnavailableBlock {
+  id: number;
+  title: string;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UnavailableBlockCreateInput {
+  title: string;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
+}
+
+export interface ScheduleHistory {
+  id: number;
+  action: string;
+  summary: string;
+  sessions_created: number;
+  exam_survival_mode: boolean;
+  details: string | null;
+  created_at: string;
+}
+
+export interface ProposedSession {
+  subject_id: number;
+  subject_name: string;
+  subject_color: string | null;
+  topic_id: number | null;
+  topic_title: string | null;
+  title: string;
+  scheduled_date: string;
+  start_time: string;
+  end_time: string;
+  planned_duration_minutes: number;
+  priority_score: number;
+  reason: string;
+}
+
+export interface UnscheduledTask {
+  topic_id: number;
+  topic_title: string;
+  subject_id: number;
+  subject_name: string;
+  estimated_duration_minutes: number;
+  reason: string;
+  conflict_type: string;
+}
+
+export interface DailyWorkload {
+  date: string;
+  day_name: string;
+  total_planned_minutes: number;
+  capacity_minutes: number;
+  sessions_count: number;
+  is_available: boolean;
+}
+
+export interface GeneratedPlanResponse {
+  start_date: string;
+  end_date: string;
+  exam_survival_mode: boolean;
+  total_proposed_sessions: number;
+  total_planned_minutes: number;
+  proposed_sessions: ProposedSession[];
+  unscheduled_tasks: UnscheduledTask[];
+  daily_workloads: DailyWorkload[];
+  explanations: string[];
+}
+
+export interface PlanGenerateRequestInput {
+  start_date?: string;
+  end_date?: string;
+  subject_ids?: number[];
+  exam_survival_mode?: boolean;
+  daily_target_hours?: number;
+  preferred_start_time?: string;
+  preferred_end_time?: string;
+  max_session_duration_minutes?: number;
+  break_duration_minutes?: number;
+}
+
+export interface ConfirmPlanRequestInput {
+  sessions: ProposedSession[];
+  mode?: 'append' | 'replace_pending';
+  action_summary?: string;
+  exam_survival_mode?: boolean;
+}
+
+export interface RecoverMissedRequestInput {
+  lookback_days?: number;
+  target_start_date?: string;
+  target_end_date?: string;
+  exam_survival_mode?: boolean;
+}
+
+export interface RecoverMissedResponse {
+  missed_sessions_detected: number;
+  recovered_sessions: ProposedSession[];
+  unrecoverable_tasks: UnscheduledTask[];
+  summary: string;
+}

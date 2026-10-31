@@ -1,10 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { Subject, Topic, StudySession, StudySessionCreateInput, StudySessionUpdateInput, SessionStatus } from '../types';
-import { getSubjects, getSubjectTopics, getStudySessions, createStudySession, updateStudySession, deleteStudySession } from '../services/api';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Subject,
+  Topic,
+  StudySession,
+  StudySessionCreateInput,
+  StudySessionUpdateInput,
+  SessionStatus,
+  StudyPreference,
+} from '../types';
+import {
+  getSubjects,
+  getSubjectTopics,
+  getStudySessions,
+  createStudySession,
+  updateStudySession,
+  deleteStudySession,
+  getStudyPreferences,
+} from '../services/api';
 import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Badge } from '../components/Badge';
 import { EmptyState } from '../components/EmptyState';
+import { PlanGeneratorModal } from '../components/PlanGeneratorModal';
+import { MissedRecoveryModal } from '../components/MissedRecoveryModal';
 import {
   CalendarIcon,
   PlusIcon,
@@ -14,11 +32,38 @@ import {
   TrashIcon,
   RefreshIcon,
   AlertCircleIcon,
+  SparklesIcon,
+  ShieldAlertIcon,
 } from '../components/Icons';
 
 interface PlannerPageProps {
   openCreateModal?: boolean;
   onResetOpenCreateModal?: () => void;
+}
+
+function getStartOfWeek(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const cur = new Date(y, m - 1, d);
+  const day = cur.getDay(); // 0 = Sun, 1 = Mon ...
+  const diff = cur.getDate() - day + (day === 0 ? -6 : 1); // target Monday
+  const monday = new Date(cur.setDate(diff));
+  return monday.toISOString().split('T')[0];
+}
+
+function addDaysToIso(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const cur = new Date(y, m - 1, d);
+  cur.setDate(cur.getDate() + days);
+  return cur.toISOString().split('T')[0];
+}
+
+function formatDayHeader(dateStr: string): { weekday: string; monthDay: string } {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const cur = new Date(y, m - 1, d);
+  return {
+    weekday: cur.toLocaleDateString(undefined, { weekday: 'short' }),
+    monthDay: cur.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+  };
 }
 
 export const PlannerPage: React.FC<PlannerPageProps> = ({
@@ -27,10 +72,20 @@ export const PlannerPage: React.FC<PlannerPageProps> = ({
 }) => {
   const todayIso = new Date().toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState<string>(todayIso);
+  const [viewMode, setViewMode] = useState<'daily' | 'weekly'>('daily');
+
   const [sessions, setSessions] = useState<StudySession[]>([]);
+  const [weeklySessions, setWeeklySessions] = useState<StudySession[]>([]);
+  const [missedCount, setMissedCount] = useState<number>(0);
+  const [preferences, setPreferences] = useState<StudyPreference | null>(null);
+
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Modals
+  const [isPlanGenOpen, setIsPlanGenOpen] = useState(false);
+  const [isMissedRecoveryOpen, setIsMissedRecoveryOpen] = useState(false);
 
   // Topics for selected subject in form
   const [formTopics, setFormTopics] = useState<Topic[]>([]);
@@ -67,39 +122,71 @@ export const PlannerPage: React.FC<PlannerPageProps> = ({
   const [deletingSession, setDeletingSession] = useState<StudySession | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
-  // Initial subjects load
+  // Calculate week range from selectedDate
+  const currentWeekStart = getStartOfWeek(selectedDate);
+  const currentWeekEnd = addDaysToIso(currentWeekStart, 6);
+
+  // 7 days array for weekly view
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDaysToIso(currentWeekStart, i));
+
+  // Initial subjects and preferences load
   useEffect(() => {
-    const initSubjects = async () => {
+    const initData = async () => {
       try {
-        const subs = await getSubjects();
+        const [subs, prefs] = await Promise.all([
+          getSubjects(),
+          getStudyPreferences().catch(() => null),
+        ]);
         setSubjects(subs);
         if (subs.length > 0) {
           setCreateForm((prev) => ({ ...prev, subject_id: subs[0].id }));
+        }
+        if (prefs) {
+          setPreferences(prefs);
         }
       } catch (err) {
         console.error(err);
       }
     };
-    initSubjects();
+    initData();
   }, []);
 
-  // Fetch sessions for selected date
-  const loadSessions = async () => {
+  // Fetch missed count
+  const loadMissedCount = useCallback(async () => {
+    try {
+      const missed = await getStudySessions({ status: 'missed' });
+      setMissedCount(missed.length);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Fetch sessions for current view
+  const loadSessions = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getStudySessions({ scheduled_date: selectedDate });
-      setSessions(data);
+      if (viewMode === 'daily') {
+        const data = await getStudySessions({ scheduled_date: selectedDate });
+        setSessions(data);
+      } else {
+        const data = await getStudySessions({
+          start_date: currentWeekStart,
+          end_date: currentWeekEnd,
+        });
+        setWeeklySessions(data);
+      }
+      await loadMissedCount();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load study sessions');
     } finally {
       setLoading(false);
     }
-  };
+  }, [viewMode, selectedDate, currentWeekStart, currentWeekEnd, loadMissedCount]);
 
   useEffect(() => {
     loadSessions();
-  }, [selectedDate]);
+  }, [loadSessions]);
 
   useEffect(() => {
     if (openCreateModal) {
@@ -300,29 +387,68 @@ export const PlannerPage: React.FC<PlannerPageProps> = ({
     }
   };
 
-  // Day shifts
+  // Day / Week shifts
   const changeDateBy = (days: number) => {
-    const cur = new Date(selectedDate);
-    cur.setDate(cur.getDate() + days);
-    setSelectedDate(cur.toISOString().split('T')[0]);
+    setSelectedDate(addDaysToIso(selectedDate, days));
   };
 
-  const totalPlannedForDay = sessions.reduce((sum, s) => sum + s.planned_duration_minutes, 0);
-  const totalActualForDay = sessions.reduce(
+  const changeWeekBy = (weeks: number) => {
+    setSelectedDate(addDaysToIso(selectedDate, weeks * 7));
+  };
+
+  // Stats calculation
+  const activeSessions = viewMode === 'daily' ? sessions : weeklySessions;
+  const totalPlanned = activeSessions.reduce((sum, s) => sum + s.planned_duration_minutes, 0);
+  const totalActual = activeSessions.reduce(
     (sum, s) => sum + (s.status === 'completed' && s.actual_duration_minutes ? s.actual_duration_minutes : 0),
     0
   );
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+      {/* Top Header & Core Actions */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-800">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Study Planner</h2>
+          <div className="flex items-center space-x-2.5">
+            <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Study Planner</h2>
+            {preferences?.exam_survival_mode && (
+              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                <ShieldAlertIcon className="w-3.5 h-3.5" />
+                <span>Survival Mode</span>
+              </span>
+            )}
+          </div>
           <p className="mt-1 text-xs text-slate-400">
-            Schedule daily focus blocks and track planned versus actual study time.
+            Intelligent constraint-aware scheduling, missed session recovery, and daily study blocks.
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Missed Recovery Trigger */}
+          <button
+            onClick={() => setIsMissedRecoveryOpen(true)}
+            className="relative inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+            title="Scan and recover missed study sessions"
+          >
+            <RefreshIcon className="w-3.5 h-3.5 text-amber-400" />
+            <span>Recover Missed</span>
+            {missedCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                {missedCount}
+              </span>
+            )}
+          </button>
+
+          {/* Intelligent Plan Generator Trigger */}
+          <button
+            onClick={() => setIsPlanGenOpen(true)}
+            className="inline-flex items-center space-x-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white shadow-sm transition"
+          >
+            <SparklesIcon className="w-3.5 h-3.5 text-sky-200" />
+            <span>Intelligent Plan</span>
+          </button>
+
+          {/* Manual Add Session */}
           <button
             onClick={() => {
               setCreateForm((prev) => ({ ...prev, scheduled_date: selectedDate }));
@@ -330,11 +456,12 @@ export const PlannerPage: React.FC<PlannerPageProps> = ({
               setIsCreateOpen(true);
             }}
             disabled={subjects.length === 0}
-            className="inline-flex items-center space-x-1.5 px-3.5 py-2 text-xs font-medium rounded-xl bg-sky-600 hover:bg-sky-500 text-white transition shadow-sm disabled:opacity-50"
+            className="inline-flex items-center space-x-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-sky-600 hover:bg-sky-500 text-white transition shadow-sm disabled:opacity-50"
           >
             <PlusIcon className="w-3.5 h-3.5" />
-            <span>Schedule Session</span>
+            <span>Add Session</span>
           </button>
+
           <button
             onClick={loadSessions}
             disabled={loading}
@@ -346,54 +473,115 @@ export const PlannerPage: React.FC<PlannerPageProps> = ({
         </div>
       </div>
 
-      {/* Date Navigation & Daily Stats Bar */}
+      {/* View Switcher, Date Navigation & Stats Bar */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => changeDateBy(-1)}
-            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition"
-          >
-            &larr; Prev Day
-          </button>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-sky-500 font-semibold"
-          />
-          <button
-            onClick={() => changeDateBy(1)}
-            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition"
-          >
-            Next Day &rarr;
-          </button>
-          {selectedDate !== todayIso && (
+        {/* Left: View Mode Tabs & Date Nav */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Daily / Weekly View Switcher */}
+          <div className="inline-flex rounded-xl bg-slate-800/80 p-0.5 border border-slate-700/60">
             <button
-              onClick={() => setSelectedDate(todayIso)}
-              className="px-2.5 py-1.5 rounded-lg bg-sky-950 text-sky-400 border border-sky-800 text-xs font-medium hover:bg-sky-900 transition"
+              onClick={() => setViewMode('daily')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
+                viewMode === 'daily'
+                  ? 'bg-sky-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
             >
-              Today
+              Daily View
             </button>
+            <button
+              onClick={() => setViewMode('weekly')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
+                viewMode === 'weekly'
+                  ? 'bg-sky-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Weekly View
+            </button>
+          </div>
+
+          {/* Date Controls */}
+          {viewMode === 'daily' ? (
+            <div className="flex items-center space-x-1.5">
+              <button
+                onClick={() => changeDateBy(-1)}
+                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition"
+                title="Previous Day"
+              >
+                &larr; Prev
+              </button>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-sky-500 font-semibold"
+              />
+              <button
+                onClick={() => changeDateBy(1)}
+                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition"
+                title="Next Day"
+              >
+                Next &rarr;
+              </button>
+              {selectedDate !== todayIso && (
+                <button
+                  onClick={() => setSelectedDate(todayIso)}
+                  className="px-2.5 py-1.5 rounded-lg bg-sky-950 text-sky-400 border border-sky-800 text-xs font-medium hover:bg-sky-900 transition"
+                >
+                  Today
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center space-x-1.5">
+              <button
+                onClick={() => changeWeekBy(-1)}
+                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition"
+                title="Previous Week"
+              >
+                &larr; Prev Week
+              </button>
+              <span className="px-3 py-1.5 text-xs font-semibold text-white bg-slate-800 rounded-lg border border-slate-700">
+                {formatDayHeader(currentWeekStart).monthDay} – {formatDayHeader(currentWeekEnd).monthDay}
+              </span>
+              <button
+                onClick={() => changeWeekBy(1)}
+                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition"
+                title="Next Week"
+              >
+                Next Week &rarr;
+              </button>
+              {selectedDate !== todayIso && (
+                <button
+                  onClick={() => setSelectedDate(todayIso)}
+                  className="px-2.5 py-1.5 rounded-lg bg-sky-950 text-sky-400 border border-sky-800 text-xs font-medium hover:bg-sky-900 transition"
+                >
+                  This Week
+                </button>
+              )}
+            </div>
           )}
         </div>
 
+        {/* Right: Summary Metrics */}
         <div className="flex items-center space-x-4 text-xs">
           <div>
             <span className="text-slate-400">Planned: </span>
-            <span className="font-semibold text-slate-200">{totalPlannedForDay} min</span>
+            <span className="font-semibold text-slate-200">{totalPlanned} min</span>
           </div>
           <div>
-            <span className="text-slate-400">Actual Recorded: </span>
-            <span className="font-semibold text-emerald-400">{totalActualForDay} min</span>
+            <span className="text-slate-400">Recorded: </span>
+            <span className="font-semibold text-emerald-400">{totalActual} min</span>
           </div>
           <div>
             <span className="text-slate-400">Sessions: </span>
-            <span className="font-semibold text-white">{sessions.length}</span>
+            <span className="font-semibold text-white">{activeSessions.length}</span>
           </div>
         </div>
       </div>
 
-      {/* Session List */}
+      {/* Error Notice */}
       {error && (
         <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-800 text-rose-300 text-xs flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -406,119 +594,244 @@ export const PlannerPage: React.FC<PlannerPageProps> = ({
         </div>
       )}
 
-      {loading && sessions.length === 0 ? (
+      {/* Loading Spinner */}
+      {loading && activeSessions.length === 0 ? (
         <div className="py-16 text-center text-slate-400 space-y-2">
           <div className="inline-block animate-spin text-sky-400">
             <RefreshIcon className="w-6 h-6" />
           </div>
-          <p className="text-xs">Loading sessions...</p>
+          <p className="text-xs">Loading study schedule...</p>
         </div>
-      ) : sessions.length === 0 ? (
-        <EmptyState
-          icon={<CalendarIcon className="w-8 h-8" />}
-          title={`No study sessions for ${selectedDate}`}
-          description="Plan your study blocks for this day to keep steady progress towards your exams."
-          actionLabel="Schedule Focus Session"
-          onAction={() => {
-            setCreateForm((prev) => ({ ...prev, scheduled_date: selectedDate }));
-            setIsCreateOpen(true);
-          }}
-        />
-      ) : (
-        <div className="space-y-3">
-          {sessions.map((sess) => (
-            <div
-              key={sess.id}
-              className="bg-slate-900 border border-slate-800 hover:border-slate-700/80 rounded-2xl p-5 shadow-sm transition flex flex-col md:flex-row md:items-center justify-between gap-4"
-            >
-              <div className="flex items-start space-x-3.5">
-                <div
-                  className="w-3.5 h-3.5 rounded-full mt-1 flex-shrink-0"
-                  style={{ backgroundColor: sess.subject_color || '#3b82f6' }}
-                />
-                <div>
-                  <div className="flex items-center space-x-2.5">
-                    <h3 className="text-base font-bold text-white tracking-tight">{sess.title}</h3>
-                    <Badge type="session_status" value={sess.status} />
-                  </div>
-                  <div className="flex items-center flex-wrap gap-2 text-xs text-slate-400 mt-1">
-                    <span className="font-semibold text-slate-300">{sess.subject_name}</span>
-                    {sess.topic_title && <span>&bull; {sess.topic_title}</span>}
-                    {sess.start_time && (
-                      <span className="flex items-center space-x-1 text-slate-400">
-                        <ClockIcon className="w-3.5 h-3.5" />
-                        <span>{sess.start_time}</span>
-                      </span>
+      ) : viewMode === 'daily' ? (
+        /* DAILY VIEW */
+        sessions.length === 0 ? (
+          <EmptyState
+            icon={<CalendarIcon className="w-8 h-8" />}
+            title={`No study sessions for ${selectedDate}`}
+            description="Use the Intelligent Plan Generator to automatically schedule your topics or add a session manually."
+            actionLabel="Generate Intelligent Plan"
+            onAction={() => setIsPlanGenOpen(true)}
+          />
+        ) : (
+          <div className="space-y-3">
+            {sessions.map((sess) => (
+              <div
+                key={sess.id}
+                className="bg-slate-900 border border-slate-800 hover:border-slate-700/80 rounded-2xl p-5 shadow-sm transition flex flex-col md:flex-row md:items-center justify-between gap-4"
+              >
+                <div className="flex items-start space-x-3.5">
+                  <div
+                    className="w-3.5 h-3.5 rounded-full mt-1 flex-shrink-0"
+                    style={{ backgroundColor: sess.subject_color || '#3b82f6' }}
+                  />
+                  <div>
+                    <div className="flex items-center space-x-2.5">
+                      <h3 className="text-base font-bold text-white tracking-tight">{sess.title}</h3>
+                      <Badge type="session_status" value={sess.status} />
+                    </div>
+                    <div className="flex items-center flex-wrap gap-2 text-xs text-slate-400 mt-1">
+                      <span className="font-semibold text-slate-300">{sess.subject_name}</span>
+                      {sess.topic_title && <span>&bull; {sess.topic_title}</span>}
+                      {sess.start_time && (
+                        <span className="flex items-center space-x-1 text-slate-400">
+                          <ClockIcon className="w-3.5 h-3.5" />
+                          <span>{sess.start_time}</span>
+                        </span>
+                      )}
+                      <span>&bull; Planned: {sess.planned_duration_minutes} min</span>
+                      {sess.status === 'completed' && sess.actual_duration_minutes !== null && (
+                        <span className="text-emerald-400 font-medium">
+                          &bull; Completed in: {sess.actual_duration_minutes} min
+                        </span>
+                      )}
+                    </div>
+                    {sess.notes && (
+                      <p className="mt-2 text-xs text-slate-400 italic bg-slate-800/40 p-2 rounded-lg border border-slate-800">
+                        "{sess.notes}"
+                      </p>
                     )}
-                    <span>&bull; Planned: {sess.planned_duration_minutes} min</span>
-                    {sess.status === 'completed' && sess.actual_duration_minutes !== null && (
-                      <span className="text-emerald-400 font-medium">
-                        &bull; Completed in: {sess.actual_duration_minutes} min
-                      </span>
-                    )}
                   </div>
-                  {sess.notes && (
-                    <p className="mt-2 text-xs text-slate-400 italic bg-slate-800/40 p-2 rounded-lg border border-slate-800">
-                      "{sess.notes}"
-                    </p>
+                </div>
+
+                <div className="flex items-center space-x-2 self-end md:self-center">
+                  {sess.status === 'pending' && (
+                    <>
+                      <button
+                        onClick={() => handleOpenCompleteModal(sess)}
+                        className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm"
+                      >
+                        <CheckIcon className="w-3.5 h-3.5" />
+                        <span>Complete</span>
+                      </button>
+                      <button
+                        onClick={() => handleQuickStatusChange(sess, 'missed')}
+                        className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-300 transition"
+                        title="Mark as Missed"
+                      >
+                        Missed
+                      </button>
+                    </>
                   )}
+                  {sess.status === 'missed' && (
+                    <button
+                      onClick={() => handleQuickStatusChange(sess, 'pending')}
+                      className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                    >
+                      Revert to Pending
+                    </button>
+                  )}
+                  {sess.status === 'completed' && (
+                    <button
+                      onClick={() => handleQuickStatusChange(sess, 'pending')}
+                      className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                    >
+                      Re-open
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleOpenEdit(sess)}
+                    className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+                    title="Edit Session"
+                  >
+                    <EditIcon className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setDeletingSession(sess)}
+                    className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition"
+                    title="Delete Session"
+                  >
+                    <TrashIcon className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
+            ))}
+          </div>
+        )
+      ) : (
+        /* WEEKLY VIEW (7-day grid) */
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+          {weekDays.map((dayDate) => {
+            const dayHeader = formatDayHeader(dayDate);
+            const isToday = dayDate === todayIso;
+            const daySessions = weeklySessions.filter((s) => s.scheduled_date === dayDate);
+            const dayPlanned = daySessions.reduce((sum, s) => sum + s.planned_duration_minutes, 0);
 
-              <div className="flex items-center space-x-2 self-end md:self-center">
-                {sess.status === 'pending' && (
-                  <>
+            return (
+              <div
+                key={dayDate}
+                className={`bg-slate-900 border rounded-2xl p-3 flex flex-col min-h-[380px] shadow-sm transition ${
+                  isToday
+                    ? 'border-sky-500/60 ring-1 ring-sky-500/20'
+                    : 'border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                {/* Column Day Header */}
+                <div className="pb-2 mb-3 border-b border-slate-800/80 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="text-xs font-bold text-white uppercase">{dayHeader.weekday}</span>
+                      {isToday && (
+                        <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-sky-500/20 text-sky-300">
+                          Today
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-slate-400">{dayHeader.monthDay}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[11px] font-semibold text-slate-300 block">{dayPlanned}m</span>
                     <button
-                      onClick={() => handleOpenCompleteModal(sess)}
-                      className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm"
+                      onClick={() => {
+                        setCreateForm((prev) => ({ ...prev, scheduled_date: dayDate }));
+                        setCreateError(null);
+                        setIsCreateOpen(true);
+                      }}
+                      className="p-1 text-slate-400 hover:text-sky-400 rounded transition"
+                      title={`Add session for ${dayDate}`}
                     >
-                      <CheckIcon className="w-3.5 h-3.5" />
-                      <span>Complete</span>
+                      <PlusIcon className="w-3 h-3" />
                     </button>
-                    <button
-                      onClick={() => handleQuickStatusChange(sess, 'missed')}
-                      className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-300 transition"
-                      title="Mark as Missed"
-                    >
-                      Missed
-                    </button>
-                  </>
-                )}
-                {sess.status === 'missed' && (
+                  </div>
+                </div>
+
+                {/* Day Sessions List */}
+                <div className="space-y-2 flex-1 overflow-y-auto">
+                  {daySessions.length === 0 ? (
+                    <div className="h-full flex items-center justify-center p-4 text-center">
+                      <span className="text-[11px] text-slate-600">No sessions</span>
+                    </div>
+                  ) : (
+                    daySessions.map((sess) => (
+                      <div
+                        key={sess.id}
+                        onClick={() => handleOpenEdit(sess)}
+                        className="group p-2 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700/60 cursor-pointer transition text-left"
+                      >
+                        <div className="flex items-center space-x-1.5 mb-1">
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: sess.subject_color || '#3b82f6' }}
+                          />
+                          <span className="text-xs font-semibold text-white truncate flex-1">
+                            {sess.title}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-slate-400">
+                          <span>{sess.start_time || 'Flexible'}</span>
+                          <span>{sess.planned_duration_minutes}m</span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between">
+                          <Badge type="session_status" value={sess.status} />
+                          {sess.status === 'pending' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenCompleteModal(sess);
+                              }}
+                              className="text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold"
+                            >
+                              ✓ Done
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Quick Daily View Jump */}
+                <div className="pt-2 mt-2 border-t border-slate-800/60 text-center">
                   <button
-                    onClick={() => handleQuickStatusChange(sess, 'pending')}
-                    className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                    onClick={() => {
+                      setSelectedDate(dayDate);
+                      setViewMode('daily');
+                    }}
+                    className="text-[10px] text-slate-400 hover:text-sky-400 font-medium transition"
                   >
-                    Revert to Pending
+                    View Day &rarr;
                   </button>
-                )}
-                {sess.status === 'completed' && (
-                  <button
-                    onClick={() => handleQuickStatusChange(sess, 'pending')}
-                    className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
-                  >
-                    Re-open
-                  </button>
-                )}
-                <button
-                  onClick={() => handleOpenEdit(sess)}
-                  className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
-                  title="Edit Session"
-                >
-                  <EditIcon className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => setDeletingSession(sess)}
-                  className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition"
-                  title="Delete Session"
-                >
-                  <TrashIcon className="w-3.5 h-3.5" />
-                </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
+
+      {/* Intelligent Plan Generator Modal */}
+      <PlanGeneratorModal
+        isOpen={isPlanGenOpen}
+        onClose={() => setIsPlanGenOpen(false)}
+        subjects={subjects}
+        initialSurvivalMode={preferences?.exam_survival_mode}
+        onPlanApplied={loadSessions}
+      />
+
+      {/* Missed Session Recovery Modal */}
+      <MissedRecoveryModal
+        isOpen={isMissedRecoveryOpen}
+        onClose={() => setIsMissedRecoveryOpen(false)}
+        onRecoveryApplied={loadSessions}
+      />
 
       {/* Schedule Session Modal */}
       <Modal
@@ -923,4 +1236,3 @@ export const PlannerPage: React.FC<PlannerPageProps> = ({
     </div>
   );
 };
-
