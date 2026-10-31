@@ -23,26 +23,26 @@ Educaterasta is an intelligent study planning platform designed to generate, ada
 educaterasta/
 ├── backend/                         # FastAPI backend application
 │   ├── alembic/                     # Database migrations
-│   │   └── versions/                # Migrations: Phase 01 baseline & Phase 02 scheduling tables
+│   │   └── versions/                # Migrations: Phase 01 baseline, Phase 02 scheduling, Phase 03 quiz tables
 │   ├── alembic.ini                  # Alembic configuration
 │   ├── app/                         # Application source code
-│   │   ├── api/v1/                  # Endpoints (subjects, topics, study-sessions, exams, planner, dashboard, analytics)
+│   │   ├── api/v1/                  # Endpoints (subjects, topics, study-sessions, exams, planner, quizzes, questions, attempts, analytics)
 │   │   ├── core/                    # Config & database connections (PRAGMA foreign_keys=ON)
-│   │   ├── models/                  # SQLAlchemy ORM models (Subject, Topic, StudySession, Exam, StudyPreference, UnavailableBlock, ScheduleHistory)
-│   │   ├── schemas/                 # Pydantic schemas for requests and responses
-│   │   ├── services/                # Scheduling engine (scheduling_engine.py) & metrics (study_service.py)
+│   │   ├── models/                  # SQLAlchemy models (Subject, Topic, StudySession, Exam, StudyPreference, Quiz, Question, QuizAttempt, TopicPerformance, TopicPrerequisite)
+│   │   ├── schemas/                 # Pydantic schemas for requests and sanitized responses
+│   │   ├── services/                # Engine algorithms (quiz_service.py, scheduling_engine.py, study_service.py)
 │   │   └── main.py                  # App entry point & CORS configuration
-│   ├── tests/                       # Pytest test suite (16 tests: health, study planner, scheduling engine)
+│   ├── tests/                       # Pytest test suite (22 tests: health, study planner, scheduling engine, quiz engine)
 │   ├── requirements.txt             # Core dependencies
 │   └── requirements-dev.txt         # Development & test dependencies
 ├── frontend/                        # React + Vite + TypeScript frontend
 │   ├── src/
-│   │   ├── components/              # Reusable UI (PlanGeneratorModal, MissedRecoveryModal, Sidebar, Modal, ProgressBar, StatCard, Badge, ConfirmDialog)
-│   │   ├── pages/                   # SaaS Views (Dashboard, Subjects, Syllabus, Planner, Exams, Analytics, Settings)
+│   │   ├── components/              # Reusable UI (QuizResultModal, PlanGeneratorModal, MissedRecoveryModal, Sidebar, Modal, ProgressBar, StatCard, Badge)
+│   │   ├── pages/                   # SaaS Views (Dashboard, Subjects, Syllabus, Planner, Quizzes, WeakTopics, Exams, Analytics, Settings)
 │   │   ├── services/                # Centralized typed API client (api.ts)
 │   │   ├── types/                   # TypeScript interfaces
 │   │   ├── App.tsx                  # Root application component with tab/hash routing
-│   │   ├── App.test.tsx             # RTL component tests (6 tests: Dashboard, Subjects, Planner, Weekly view, Modals, Settings)
+│   │   ├── App.test.tsx             # RTL component tests (8 tests: Dashboard, Subjects, Planner, Settings, Quizzes & Weak Topics)
 │   │   └── main.tsx                 # DOM mounting point
 │   ├── package.json                 # Node dependencies and scripts
 │   ├── vite.config.ts               # Vite & Vitest configuration
@@ -120,6 +120,38 @@ The frontend will be accessible at `http://localhost:5173/`.
 
 ## API Endpoints Reference
 
+### Quizzes & Assessment Engine (Phase 03)
+- `GET /api/v1/quizzes` &mdash; List quizzes with subject filters, difficulty, and question counts
+- `POST /api/v1/quizzes` &mdash; Create customized quiz for specific subjects and syllabus topics
+- `GET /api/v1/quizzes/{id}` &mdash; Quiz details with assigned topic list
+- `PUT /api/v1/quizzes/{id}` &mdash; Update quiz parameters, passing percentage, and draft/published status
+- `DELETE /api/v1/quizzes/{id}` &mdash; Delete quiz and cascade attempt associations
+- `POST /api/v1/quizzes/{id}/start` &mdash; Start quiz attempt (strictly returns sanitized questions without answer keys)
+- `GET /api/v1/quizzes/adaptive/next-question` &mdash; Dynamically pick next practice question matching real-time mastery
+
+### Question Bank Management (Phase 03)
+- `GET /api/v1/questions` &mdash; List questions in bank with topic, difficulty, and search filters
+- `POST /api/v1/questions` &mdash; Create question (Single choice, Multiple select, True/False, Short answer)
+- `GET /api/v1/questions/{id}` &mdash; Question authoring detail view with correct answer and explanation
+- `PUT /api/v1/questions/{id}` &mdash; Update question text, options, marks, or explanation
+- `DELETE /api/v1/questions/{id}` &mdash; Delete question from question bank
+
+### Quiz Attempts & Evaluation (Phase 03)
+- `GET /api/v1/attempts` &mdash; List user's past quiz attempts with scores and timestamps
+- `GET /api/v1/attempts/{id}` &mdash; Fetch attempt progress (resumes active quiz state or returns results if completed)
+- `POST /api/v1/attempts/{id}/answers` &mdash; Auto-save individual question answer during active attempt
+- `POST /api/v1/attempts/{id}/submit` &mdash; Submit attempt, trigger evaluation with negative marking, mistake categorization, and update cumulative topic performance
+- `GET /api/v1/attempts/{id}/results` &mdash; Post-submission score report, topic breakdowns, mistake review, and study recommendations
+
+### Diagnostic Analytics & Topic Prerequisites (Phase 03)
+- `GET /api/v1/analytics/topic-performance` &mdash; Detailed cumulative topic performance records
+- `GET /api/v1/analytics/weak-topics` &mdash; Automated weak topic detection with confidence levels, reasons, and unmet prerequisite warnings
+- `GET /api/v1/analytics/mistakes` &mdash; Mistake analysis log with repeated error identification and suggested remedies
+- `GET /api/v1/analytics/recommendations` &mdash; Actionable practice recommendations tailored to syllabus weaknesses
+- `GET /api/v1/topics/{id}/prerequisites` &mdash; Inspect topic prerequisites and dependent topics
+- `POST /api/v1/topics/{id}/prerequisites` &mdash; Add topic dependency (enforces cycle prevention via DFS DAG check)
+- `DELETE /api/v1/topics/{id}/prerequisites/{prereq_id}` &mdash; Remove prerequisite dependency
+
 ### Intelligent Scheduling Engine (Phase 02)
 - `POST /api/v1/planner/generate` &mdash; Generate a constraint-aware study plan with priority explanations and capacity checks
 - `POST /api/v1/planner/preview-reschedule` &mdash; Preview rescheduling changes without persisting
@@ -166,7 +198,7 @@ The frontend will be accessible at `http://localhost:5173/`.
 
 ### Backend Tests (Pytest)
 
-Run the backend test suite (16 tests covering health check, study planner CRUD, and intelligent scheduling algorithms):
+Run the backend test suite (22 tests covering health check, study planner CRUD, scheduling algorithms, and the Phase 03 quiz assessment engine):
 
 ```bash
 python3 -m pytest backend/tests -v
@@ -174,7 +206,7 @@ python3 -m pytest backend/tests -v
 
 ### Frontend Tests (Vitest & React Testing Library)
 
-Run the frontend test suite (6 tests covering Dashboard, Subjects, Planner daily/weekly timelines, Plan Generator Modal, and Settings):
+Run the frontend test suite (8 tests covering Dashboard, Subjects, Planner daily/weekly timelines, Settings, Quiz Taking & Public Security Sanitization, and Weak Topics Diagnosis):
 
 ```bash
 cd frontend
@@ -197,7 +229,7 @@ npm run build
 - [x] **Phase 00**: Foundation & Baseline Setup (FastAPI, SQLite, React+Vite+TS, Tailwind CSS, health endpoints, CI-ready testing)
 - [x] **Phase 01**: Core Study Planner (Subject/Topic syllabus management, study sessions, exams, real analytics dashboard, SQLite persistence, Alembic migrations)
 - [x] **Phase 02**: Intelligent Scheduling Engine (Constraint-aware schedule generation, dynamic rule-based priority engine, automatic rescheduling, missed session recovery, Exam Survival Mode, daily & weekly views, availability configuration & audit history)
-- [ ] **Phase 03**: Diagnostic Assessment & Adaptive Quizzes
+- [x] **Phase 03**: Diagnostic Assessment & Adaptive Quizzes (Question bank with multi-question types, timed quiz runner, public security sanitization, negative marking, diagnostic weak topic detection, mistake analysis with repeated errors, topic prerequisite DAG cycle prevention, and adaptive difficulty practice)
 - [ ] **Phase 04**: AI Study Copilot & Habit Personalization
 - [ ] **Phase 05**: Multi-User Authentication & Cloud Synchronization (PostgreSQL)
 - [ ] **Phase 06**: Production Hardening, Rate Limiting & Enterprise Security

@@ -382,4 +382,339 @@ describe('EDUCATERASTA Phase 01 & Phase 02 Frontend Tests', () => {
       expect(screen.getByText('Save Availability Preferences')).toBeInTheDocument();
     });
   });
+
+  it('navigates to Quizzes & Practice, validates sanitized question attempt, and shows results', async () => {
+    vi.spyOn(global, 'fetch').mockImplementation((url: RequestInfo | URL, init?: RequestInit) => {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      const method = init?.method || 'GET';
+
+      if (urlStr.includes('/api/v1/subjects')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { id: 1, name: 'Mathematics', description: 'Calculus and Algebra', color: '#3b82f6', created_at: new Date().toISOString() },
+          ],
+        } as Response);
+      }
+      if (urlStr.includes('/api/v1/quizzes') && !urlStr.includes('/attempts') && method === 'GET') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            {
+              id: 1,
+              subject_id: 1,
+              title: 'Calculus Diagnostics Quiz',
+              description: 'Assess derivatives mastery',
+              difficulty: 'medium',
+              duration_minutes: 15,
+              passing_percentage: 70.0,
+              status: 'published',
+              feedback_mode: 'post_submission',
+              question_count: 1,
+              topic_ids: [1],
+              topic_titles: ['Derivatives'],
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              subject_name: 'Mathematics',
+              subject_color: '#3b82f6',
+            },
+          ],
+        } as Response);
+      }
+      if (urlStr.includes('/api/v1/quizzes/1/start') && method === 'POST') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            attempt_id: 101,
+            quiz_id: 1,
+            title: 'Calculus Diagnostics Quiz',
+            duration_minutes: 15,
+            feedback_mode: 'post_submission',
+            started_at: new Date().toISOString(),
+            total_questions: 1,
+            saved_answers: {},
+            questions: [
+              {
+                id: 10,
+                subject_id: 1,
+                topic_id: 1,
+                question_text: 'What is the derivative of sin(x)?',
+                question_type: 'single_choice',
+                difficulty: 'medium',
+                marks: 4.0,
+                negative_marks: 1.0,
+                options: [
+                  { id: 'A', text: 'cos(x)' },
+                  { id: 'B', text: '-cos(x)' },
+                ],
+                // Security Check: Public question payload NEVER includes correct_answer or explanation
+              },
+            ],
+          }),
+        } as Response);
+      }
+      if (urlStr.includes('/api/v1/attempts/101/answers') && method === 'POST') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            id: 1,
+            attempt_id: 101,
+            question_id: 10,
+            selected_answer: 'A',
+            is_correct: null,
+            marks_awarded: null,
+          }),
+        } as Response);
+      }
+      if (urlStr.includes('/api/v1/attempts/101/submit') && method === 'POST') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            attempt_id: 101,
+            quiz_id: 1,
+            quiz_title: 'Calculus Diagnostics Quiz',
+            status: 'completed',
+            started_at: new Date().toISOString(),
+            submitted_at: new Date().toISOString(),
+            time_spent_seconds: 45,
+            total_questions: 1,
+            attempted_questions: 1,
+            correct_answers: 1,
+            incorrect_answers: 0,
+            unanswered_questions: 0,
+            unanswered: 0,
+            total_marks: 4.0,
+            obtained_marks: 4.0,
+            accuracy_percentage: 100.0,
+            is_passed: true,
+            passing_percentage: 70.0,
+            topic_breakdown: [
+              {
+                topic_id: 1,
+                topic_title: 'Derivatives',
+                total_questions: 1,
+                correct_count: 1,
+                incorrect_count: 0,
+                accuracy_percentage: 100.0,
+                obtained_marks: 4.0,
+                total_marks: 4.0,
+              },
+            ],
+            difficulty_breakdown: [
+              {
+                difficulty: 'medium',
+                total_questions: 1,
+                correct_count: 1,
+                accuracy_percentage: 100.0,
+              },
+            ],
+            mistakes: [],
+            answers: [
+              {
+                question_id: 10,
+                question_text: 'What is the derivative of sin(x)?',
+                question_type: 'single_choice',
+                difficulty: 'medium',
+                topic_id: 1,
+                topic_title: 'Derivatives',
+                selected_answer: 'A',
+                correct_answer: 'A',
+                is_correct: true,
+                obtained_marks: 4.0,
+                marks: 4.0,
+                negative_marks: 1.0,
+                explanation: 'By definition of trigonometric derivative, d/dx(sin x) = cos x.',
+                mistake_category: null,
+                options: [
+                  { id: 'A', text: 'cos(x)' },
+                  { id: 'B', text: '-cos(x)' },
+                ],
+              },
+            ],
+            recommendations: ['Great work on trigonometric derivatives! Continue to integrals next.'],
+          }),
+        } as Response);
+      }
+      return Promise.resolve({ ok: true, json: async () => [] } as Response);
+    });
+
+    render(<App />);
+
+    // Click on Quizzes & Practice in navigation
+    const quizzesNav = screen.getAllByText('Quizzes & Practice').find((el) => el.closest('button'))?.closest('button');
+    expect(quizzesNav).toBeDefined();
+    fireEvent.click(quizzesNav!);
+
+    await waitFor(() => {
+      expect(screen.getByText('Quizzes & Assessment')).toBeInTheDocument();
+      expect(screen.getByText('Calculus Diagnostics Quiz')).toBeInTheDocument();
+      expect(screen.getByText('Take Quiz')).toBeInTheDocument();
+    });
+
+    // Start Quiz
+    fireEvent.click(screen.getByText('Take Quiz'));
+
+    await waitFor(() => {
+      // Quiz Taking UI rendered
+      expect(screen.getByText('Question 1 of 1')).toBeInTheDocument();
+      expect(screen.getByText('What is the derivative of sin(x)?')).toBeInTheDocument();
+      expect(screen.getByText('cos(x)')).toBeInTheDocument();
+      // Security Check: Ensure explanation is NOT leaked in taking state
+      expect(screen.queryByText('By definition of trigonometric derivative')).not.toBeInTheDocument();
+    });
+
+    // Select the option
+    fireEvent.click(screen.getByText('cos(x)'));
+
+    // Open confirmation
+    const reviewBtn = screen.getByText('Review & Submit');
+    fireEvent.click(reviewBtn);
+
+    // Confirm submission
+    await waitFor(() => {
+      expect(screen.getByText('Confirm Submission')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('Confirm Submission'));
+
+    // Modal result should render post-submission details and explanations
+    await waitFor(() => {
+      expect(screen.getByText('Assessment Performance Analysis')).toBeInTheDocument();
+      expect(screen.getByText('Assessment Passed')).toBeInTheDocument();
+      expect(screen.getByText('100%')).toBeInTheDocument();
+      expect(screen.getByText('By definition of trigonometric derivative, d/dx(sin x) = cos x.')).toBeInTheDocument();
+    });
+  });
+
+  it('navigates to Weak Topics & Mistakes and displays diagnostic metrics and recommendations', async () => {
+    vi.spyOn(global, 'fetch').mockImplementation((url: RequestInfo | URL) => {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+
+      if (urlStr.includes('/api/v1/analytics/weak-topics')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            {
+              topic_id: 2,
+              topic_title: 'Integration by Parts',
+              subject_id: 1,
+              subject_name: 'Mathematics',
+              subject_color: '#3b82f6',
+              attempts_count: 6,
+              accuracy_percentage: 33.3,
+              mastery_estimate: 33.3,
+              classification: 'Weak',
+              confidence_level: 'High',
+              reason: 'Accuracy is 33.3% across 6 attempts (below 50% threshold).',
+              recommended_action: 'Allocate high-priority revision session and practice foundation problems.',
+              prerequisite_warnings: ['Prerequisite "Basic Antiderivatives" is incomplete.'],
+            },
+          ],
+        } as Response);
+      }
+      if (urlStr.includes('/api/v1/analytics/topic-performance')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            {
+              id: 1,
+              topic_id: 2,
+              subject_id: 1,
+              total_questions_attempted: 6,
+              correct_questions: 2,
+              accuracy_percentage: 33.3,
+              mastery_score: 0.33,
+              last_attempted_at: new Date().toISOString(),
+              topic_title: 'Integration by Parts',
+              subject_name: 'Mathematics',
+            },
+          ],
+        } as Response);
+      }
+      if (urlStr.includes('/api/v1/analytics/mistakes')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            {
+              id: 1,
+              attempt_id: 101,
+              question_id: 12,
+              topic_id: 2,
+              mistake_category: 'conceptual',
+              is_repeated: true,
+              question_text: 'Evaluate integral of x*e^x dx',
+              topic_title: 'Integration by Parts',
+              subject_name: 'Mathematics',
+              selected_answer: 'e^x + C',
+              correct_answer: 'x*e^x - e^x + C',
+              explanation: 'Use parts formula: uv - int(v du)',
+              suggested_action: 'Review Integration by Parts derivation before taking more tests.',
+              attempted_at: new Date().toISOString(),
+            },
+          ],
+        } as Response);
+      }
+      if (urlStr.includes('/api/v1/analytics/recommendations')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            {
+              id: 'rec_1',
+              type: 'adaptive_practice',
+              topic_id: 2,
+              topic_title: 'Integration by Parts',
+              subject_name: 'Mathematics',
+              priority: 'high',
+              title: 'Targeted Practice: Integration by Parts',
+              description: 'Topic is marked Weak with repeated conceptual errors. Practice 5 easy questions.',
+              action_type: 'start_quiz',
+            },
+          ],
+        } as Response);
+      }
+      if (urlStr.includes('/api/v1/subjects')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { id: 1, name: 'Mathematics', description: 'Calculus and Algebra', color: '#3b82f6', created_at: new Date().toISOString() },
+          ],
+        } as Response);
+      }
+      return Promise.resolve({ ok: true, json: async () => [] } as Response);
+    });
+
+    render(<App />);
+
+    // Click on Weak Topics & Mistakes in navigation
+    const weakNav = screen.getAllByText('Weak Topics & Mistakes').find((el) => el.closest('button'))?.closest('button');
+    expect(weakNav).toBeDefined();
+    fireEvent.click(weakNav!);
+
+    await waitFor(() => {
+      expect(screen.getByText('Weak Topic Detection & Mistake Analyzer')).toBeInTheDocument();
+      expect(screen.getByText('Integration by Parts')).toBeInTheDocument();
+      expect(screen.getAllByText('33.3%')[0]).toBeInTheDocument();
+      expect(screen.getByText('Prerequisite Alert')).toBeInTheDocument();
+      expect(screen.getByText(/Prerequisite "Basic Antiderivatives" is incomplete/)).toBeInTheDocument();
+    });
+
+    // Check Mistakes tab
+    const mistakesTab = screen.getByText(/Mistake Analysis Log/);
+    fireEvent.click(mistakesTab);
+
+    await waitFor(() => {
+      expect(screen.getByText('Evaluate integral of x*e^x dx')).toBeInTheDocument();
+      expect(screen.getByText('REPEATED ERROR')).toBeInTheDocument();
+      expect(screen.getByText('x*e^x - e^x + C')).toBeInTheDocument();
+    });
+
+    // Check Recommendations tab
+    const recTab = screen.getByText(/Practice Recommendations/);
+    fireEvent.click(recTab);
+
+    await waitFor(() => {
+      expect(screen.getByText('Targeted Practice: Integration by Parts')).toBeInTheDocument();
+      expect(screen.getByText(/Topic is marked Weak with repeated conceptual errors/)).toBeInTheDocument();
+      expect(screen.getByText('Take Action →')).toBeInTheDocument();
+    });
+  });
 });

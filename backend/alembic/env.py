@@ -22,6 +22,14 @@ from backend.app.models import (
     StudyPreference,
     UnavailableBlock,
     ScheduleHistory,
+    Quiz,
+    QuizTopic,
+    Question,
+    QuizQuestion,
+    QuizAttempt,
+    AttemptAnswer,
+    TopicPerformance,
+    TopicPrerequisite,
 )
 
 # this is the Alembic Config object, which provides

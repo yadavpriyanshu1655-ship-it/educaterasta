@@ -21,4 +21,6 @@ class Subject(Base):
     topics = relationship("Topic", back_populates="subject", cascade="all, delete-orphan")
     study_sessions = relationship("StudySession", back_populates="subject", cascade="all, delete-orphan")
     exams = relationship("Exam", back_populates="subject", cascade="all, delete-orphan")
+    quizzes = relationship("Quiz", back_populates="subject", cascade="all, delete-orphan")
+    questions = relationship("Question", back_populates="subject", cascade="all, delete-orphan")
 

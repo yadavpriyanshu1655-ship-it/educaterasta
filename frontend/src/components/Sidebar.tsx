@@ -9,9 +9,20 @@ import {
   SettingsIcon,
   MenuIcon,
   XIcon,
+  ShieldAlertIcon,
+  TargetIcon,
 } from './Icons';
 
-export type NavTab = 'dashboard' | 'subjects' | 'syllabus' | 'planner' | 'exams' | 'analytics' | 'settings';
+export type NavTab =
+  | 'dashboard'
+  | 'subjects'
+  | 'syllabus'
+  | 'planner'
+  | 'quizzes'
+  | 'weak-topics'
+  | 'exams'
+  | 'analytics'
+  | 'settings';
 
 interface SidebarProps {
   currentTab: NavTab;
@@ -26,7 +37,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
     { id: 'subjects', label: 'Subjects', icon: <BookOpenIcon className="w-5 h-5" /> },
     { id: 'syllabus', label: 'Syllabus & Topics', icon: <LayersIcon className="w-5 h-5" /> },
     { id: 'planner', label: 'Study Planner', icon: <CalendarIcon className="w-5 h-5" /> },
-    { id: 'exams', label: 'Examinations', icon: <AwardIcon className="w-5 h-5" /> },
+    { id: 'quizzes', label: 'Quizzes & Practice', icon: <AwardIcon className="w-5 h-5" /> },
+    { id: 'weak-topics', label: 'Weak Topics & Mistakes', icon: <ShieldAlertIcon className="w-5 h-5" /> },
+    { id: 'exams', label: 'Examinations', icon: <TargetIcon className="w-5 h-5" /> },
     { id: 'analytics', label: 'Analytics', icon: <ChartIcon className="w-5 h-5" /> },
     { id: 'settings', label: 'Settings', icon: <SettingsIcon className="w-5 h-5" /> },
   ];

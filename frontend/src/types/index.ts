@@ -313,3 +313,310 @@ export interface RecoverMissedResponse {
   unrecoverable_tasks: UnscheduledTask[];
   summary: string;
 }
+
+
+// --- Phase 03: Quiz Engine & Weak Topic Detection ---
+
+export type QuestionType = 'single_choice' | 'multiple_select' | 'true_false' | 'short_answer';
+export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
+export type QuizStatus = 'draft' | 'published';
+export type QuizFeedbackMode = 'post_submission' | 'instant';
+export type AttemptStatus = 'in_progress' | 'completed' | 'abandoned';
+export type TopicClassification = 'Strong' | 'Moderate' | 'Needs Improvement' | 'Weak' | 'Insufficient Data';
+
+export interface QuestionOption {
+  id: string;
+  text: string;
+}
+
+export interface QuestionPublic {
+  id: number;
+  subject_id: number;
+  topic_id: number;
+  question_text: string;
+  question_type: QuestionType;
+  difficulty: QuestionDifficulty;
+  options: QuestionOption[] | null;
+  marks: number;
+  negative_marks: number;
+  question_order?: number;
+}
+
+export interface QuestionDetail extends QuestionPublic {
+  correct_answer: string | string[];
+  explanation: string | null;
+  source: string | null;
+  subject_name?: string;
+  topic_title?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuestionCreateInput {
+  subject_id: number;
+  topic_id: number;
+  question_text: string;
+  question_type: QuestionType;
+  difficulty: QuestionDifficulty;
+  options?: QuestionOption[];
+  correct_answer: string | string[];
+  explanation?: string;
+  marks?: number;
+  negative_marks?: number;
+  source?: string;
+}
+
+export interface QuestionUpdateInput {
+  subject_id?: number;
+  topic_id?: number;
+  question_text?: string;
+  question_type?: QuestionType;
+  difficulty?: QuestionDifficulty;
+  options?: QuestionOption[];
+  correct_answer?: string | string[];
+  explanation?: string;
+  marks?: number;
+  negative_marks?: number;
+  source?: string;
+}
+
+export interface Quiz {
+  id: number;
+  subject_id: number;
+  subject_name: string;
+  subject_color: string | null;
+  title: string;
+  description: string | null;
+  duration_minutes: number;
+  difficulty: QuestionDifficulty;
+  passing_percentage: number;
+  status: QuizStatus;
+  feedback_mode: QuizFeedbackMode;
+  question_count: number;
+  topic_ids: number[];
+  topic_titles: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuizCreateInput {
+  subject_id: number;
+  title: string;
+  description?: string;
+  duration_minutes?: number;
+  difficulty?: QuestionDifficulty;
+  passing_percentage?: number;
+  status?: QuizStatus;
+  feedback_mode?: QuizFeedbackMode;
+  topic_ids?: number[];
+  question_ids?: number[];
+}
+
+export interface QuizUpdateInput {
+  subject_id?: number;
+  title?: string;
+  description?: string;
+  duration_minutes?: number;
+  difficulty?: QuestionDifficulty;
+  passing_percentage?: number;
+  status?: QuizStatus;
+  feedback_mode?: QuizFeedbackMode;
+  topic_ids?: number[];
+  question_ids?: number[];
+}
+
+export interface QuizStartResponse {
+  attempt_id: number;
+  quiz_id: number;
+  title: string;
+  duration_minutes: number;
+  feedback_mode: QuizFeedbackMode;
+  started_at: string;
+  total_questions: number;
+  questions: QuestionPublic[];
+  saved_answers: Record<number, any>;
+}
+
+export interface SaveAnswerInput {
+  question_id: number;
+  selected_answer: string | string[] | null;
+  time_spent_seconds?: number;
+}
+
+export interface SubmitQuizInput {
+  answers?: SaveAnswerInput[];
+}
+
+export interface AnswerReview {
+  question_id: number;
+  question_text: string;
+  question_type: QuestionType;
+  difficulty: QuestionDifficulty;
+  topic_id: number;
+  topic_title: string;
+  options?: QuestionOption[];
+  selected_answer: any;
+  correct_answer: any;
+  is_correct: boolean;
+  obtained_marks: number;
+  marks: number;
+  negative_marks: number;
+  explanation: string | null;
+  mistake_category: string | null;
+}
+
+export interface TopicBreakdown {
+  topic_id: number;
+  topic_title: string;
+  total_questions: number;
+  correct_count: number;
+  incorrect_count: number;
+  accuracy_percentage: number;
+  obtained_marks: number;
+  total_marks: number;
+}
+
+export interface DifficultyBreakdown {
+  difficulty: string;
+  total_questions: number;
+  correct_count: number;
+  accuracy_percentage: number;
+}
+
+export interface QuizResult {
+  attempt_id: number;
+  quiz_id: number;
+  quiz_title: string;
+  status: string;
+  started_at: string;
+  submitted_at: string | null;
+  time_spent_seconds: number;
+  total_questions: number;
+  attempted_questions: number;
+  correct_answers: number;
+  incorrect_answers: number;
+  unanswered_questions: number;
+  total_marks: number;
+  obtained_marks: number;
+  accuracy_percentage: number;
+  is_passed: boolean;
+  passing_percentage: number;
+  topic_breakdown: TopicBreakdown[];
+  difficulty_breakdown: DifficultyBreakdown[];
+  mistakes: AnswerReview[];
+  answers: AnswerReview[];
+  recommendations: string[];
+}
+
+export interface QuizAttemptSummary {
+  id: number;
+  quiz_id: number;
+  quiz_title: string;
+  subject_name: string;
+  subject_color: string | null;
+  status: string;
+  started_at: string;
+  submitted_at: string | null;
+  time_spent_seconds: number;
+  total_questions: number;
+  obtained_marks: number;
+  total_marks: number;
+  accuracy_percentage: number;
+  is_passed: boolean;
+}
+
+export interface TopicPerformance {
+  topic_id: number;
+  topic_title: string;
+  subject_id: number;
+  subject_name: string;
+  subject_color: string | null;
+  attempts_count: number;
+  correct_count: number;
+  incorrect_count: number;
+  accuracy_percentage: number;
+  mastery_estimate: number;
+  classification: TopicClassification;
+  confidence_level: 'Low' | 'Medium' | 'High';
+  last_attempted_at: string | null;
+  updated_at: string;
+}
+
+export interface WeakTopic {
+  topic_id: number;
+  topic_title: string;
+  subject_id: number;
+  subject_name: string;
+  subject_color: string | null;
+  accuracy_percentage: number;
+  mastery_estimate: number;
+  attempts_count: number;
+  classification: TopicClassification;
+  confidence_level: 'Low' | 'Medium' | 'High';
+  reason: string;
+  recommended_action: string;
+  prerequisite_warnings: string[];
+}
+
+export interface MistakeAnalysis {
+  question_id: number;
+  question_text: string;
+  question_type: QuestionType;
+  topic_id: number;
+  topic_title: string;
+  subject_name: string;
+  selected_answer: any;
+  correct_answer: any;
+  explanation: string | null;
+  mistake_category: string;
+  is_repeated: boolean;
+  attempt_id: number;
+  attempted_at: string;
+  suggested_action: string;
+}
+
+export interface PracticeRecommendation {
+  id: string;
+  type: string;
+  topic_id?: number;
+  topic_title?: string;
+  subject_name?: string;
+  priority: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  action_type: string;
+  action_payload?: Record<string, any>;
+}
+
+export interface PrerequisiteCreateInput {
+  prerequisite_topic_id: number;
+  relationship_type?: string;
+}
+
+export interface Prerequisite {
+  id: number;
+  topic_id: number;
+  topic_title: string;
+  prerequisite_topic_id: number;
+  prerequisite_topic_title: string;
+  relationship_type: string;
+  created_at: string;
+}
+
+export interface TopicDependencies {
+  topic_id: number;
+  topic_title: string;
+  prerequisites: Prerequisite[];
+  dependents: Prerequisite[];
+}
+
+export interface AdaptiveQuestion {
+  question: QuestionPublic;
+  topic_id: number;
+  topic_title: string;
+  subject_id: number;
+  subject_name: string;
+  difficulty: QuestionDifficulty;
+  current_topic_mastery: number;
+  reason: string;
+}

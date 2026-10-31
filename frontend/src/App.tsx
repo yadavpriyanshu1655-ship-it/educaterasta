@@ -7,6 +7,8 @@ import { PlannerPage } from './pages/PlannerPage';
 import { ExamsPage } from './pages/ExamsPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { QuizPage } from './pages/QuizPage';
+import { WeakTopicsPage } from './pages/WeakTopicsPage';
 
 export const App: React.FC = () => {
   // Sync tab with browser URL hash if present
@@ -17,6 +19,8 @@ export const App: React.FC = () => {
       'subjects',
       'syllabus',
       'planner',
+      'quizzes',
+      'weak-topics',
       'exams',
       'analytics',
       'settings',
@@ -44,6 +48,8 @@ export const App: React.FC = () => {
         'subjects',
         'syllabus',
         'planner',
+        'quizzes',
+        'weak-topics',
         'exams',
         'analytics',
         'settings',
@@ -112,6 +118,16 @@ export const App: React.FC = () => {
             />
           )}
 
+          {currentTab === 'quizzes' && <QuizPage />}
+
+          {currentTab === 'weak-topics' && (
+            <WeakTopicsPage
+              onScheduleTopic={(_topicId, _subjectId, _topicTitle) => {
+                handleOpenNewSessionFromAnywhere();
+              }}
+            />
+          )}
+
           {currentTab === 'exams' && (
             <ExamsPage
               openCreateModal={triggerNewExam}
@@ -125,7 +141,7 @@ export const App: React.FC = () => {
         </main>
 
         <footer className="border-t border-slate-900 py-6 px-6 text-center text-xs text-slate-500">
-          EDUCATERASTA &copy; {new Date().getFullYear()} &mdash; Phase 01: Core Study Planner
+          EDUCATERASTA &copy; {new Date().getFullYear()} &mdash; AI Personalized Study Planning Platform &bull; Phase 03
         </footer>
       </div>
     </div>
