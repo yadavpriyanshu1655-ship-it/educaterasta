@@ -10,6 +10,7 @@ from backend.app.api.v1.planner import router as planner_router
 from backend.app.api.v1.quizzes import router as quizzes_router
 from backend.app.api.v1.questions import router as questions_router
 from backend.app.api.v1.attempts import router as attempts_router
+from backend.app.api.v1.revisions import router as revisions_router
 
 api_router = APIRouter()
 api_router.include_router(health_router, tags=["Health"])
@@ -23,3 +24,4 @@ api_router.include_router(planner_router, prefix="/planner", tags=["Intelligent 
 api_router.include_router(quizzes_router, prefix="/quizzes", tags=["Quizzes"])
 api_router.include_router(questions_router, prefix="/questions", tags=["Questions"])
 api_router.include_router(attempts_router, prefix="/attempts", tags=["Quiz Attempts"])
+api_router.include_router(revisions_router, prefix="/revisions", tags=["Smart Revisions"])

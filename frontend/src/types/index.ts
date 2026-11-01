@@ -620,3 +620,136 @@ export interface AdaptiveQuestion {
   current_topic_mastery: number;
   reason: string;
 }
+
+// ========================================================
+// PHASE 04: SMART REVISION ENGINE TYPES
+// ========================================================
+
+export type RevisionRiskCategory = 'Low' | 'Moderate' | 'High' | 'Critical';
+export type RevisionStatus = 'scheduled' | 'due' | 'overdue' | 'completed' | 'snoozed';
+
+export interface RevisionPlan {
+  id: number;
+  topic_id: number;
+  subject_id: number;
+  topic_title: string;
+  subject_name: string;
+  subject_color: string | null;
+  current_interval_days: number;
+  last_revision_at: string | null;
+  next_revision_at: string;
+  revision_count: number;
+  consecutive_successes: number;
+  consecutive_failures: number;
+  risk_score: number;
+  risk_category: RevisionRiskCategory;
+  status: RevisionStatus;
+  is_due: boolean;
+  is_overdue: boolean;
+  days_until_due: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RevisionPlanDetail extends RevisionPlan {
+  topic_description: string | null;
+  topic_status: string;
+  topic_priority: string;
+  recent_mistakes: Array<{
+    question_id: number;
+    question_text: string;
+    mistake_category: string | null;
+    is_repeated: boolean;
+    explanation: string | null;
+  }>;
+  sample_questions: Array<{
+    id: number;
+    question_text: string;
+    difficulty: string;
+    options: any;
+    question_type: string;
+  }>;
+  prerequisites: string[];
+  mastery_score: number | null;
+}
+
+export interface RevisionAttempt {
+  id: number;
+  revision_plan_id: number;
+  topic_id: number;
+  topic_title?: string;
+  subject_name?: string;
+  started_at: string;
+  completed_at: string;
+  duration_minutes: number;
+  confidence_rating: number; // 1 to 5
+  quiz_accuracy?: number | null;
+  self_assessment?: string | null;
+  notes?: string | null;
+  result: 'success' | 'partial' | 'failed';
+  created_at: string;
+}
+
+export interface RevisionAttemptCreateInput {
+  confidence_rating: number; // 1 to 5
+  duration_minutes?: number;
+  quiz_accuracy?: number;
+  self_assessment?: string;
+  notes?: string;
+}
+
+export interface RevisionSnoozeInput {
+  snooze_days: number;
+  reason?: string;
+}
+
+export interface RevisionSkipInput {
+  reason: string;
+}
+
+export interface RevisionEvent {
+  id: number;
+  revision_plan_id: number;
+  event_type: string;
+  previous_due_date?: string | null;
+  new_due_date?: string | null;
+  reason?: string | null;
+  details?: string | null;
+  created_at: string;
+}
+
+export interface RevisionOverviewMetrics {
+  total_plans: number;
+  due_today: number;
+  overdue_count: number;
+  completed_total: number;
+  average_confidence: number;
+  retention_rate_percentage: number;
+  risk_distribution: {
+    Low: number;
+    Moderate: number;
+    High: number;
+    Critical: number;
+  };
+}
+
+export interface ForgettingRiskItem {
+  topic_id: number;
+  topic_title: string;
+  subject_name: string;
+  subject_color: string | null;
+  risk_score: number;
+  risk_category: RevisionRiskCategory;
+  current_interval_days: number;
+  days_since_last_revision: number;
+  consecutive_failures: number;
+  reason: string;
+  recommended_action: string;
+  suggested_revision_date: string;
+}
+
+export interface ScheduleRevisionAsSessionInput {
+  scheduled_date: string;
+  start_time: string;
+  duration_minutes?: number;
+}

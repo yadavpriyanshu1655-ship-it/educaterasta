@@ -28,4 +28,5 @@ class Topic(Base):
 
     subject = relationship("Subject", back_populates="topics")
     study_sessions = relationship("StudySession", back_populates="topic")
+    revision_plan = relationship("RevisionPlan", back_populates="topic", uselist=False, cascade="all, delete-orphan")
 

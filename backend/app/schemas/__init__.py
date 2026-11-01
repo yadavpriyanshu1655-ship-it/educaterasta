@@ -49,6 +49,19 @@ from backend.app.schemas.quiz import (
     TopicDependenciesResponse,
     AdaptiveQuestionResponse,
 )
+from backend.app.schemas.revision import (
+    RevisionPlanCreate,
+    RevisionPlanResponse,
+    RevisionPlanDetailResponse,
+    RevisionAttemptCreate,
+    RevisionAttemptResponse,
+    RevisionSnoozeInput,
+    RevisionSkipInput,
+    RevisionEventResponse,
+    RevisionOverviewMetrics,
+    ForgettingRiskItem,
+    ScheduleRevisionAsSessionInput,
+)
 
 __all__ = [
     "HealthCheckResponse",

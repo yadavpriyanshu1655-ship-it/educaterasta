@@ -12,12 +12,17 @@ from backend.app.schemas.quiz import (
     MistakeAnalysisItem,
     RecommendationItem,
 )
+from backend.app.schemas.revision import (
+    RevisionOverviewMetrics,
+    ForgettingRiskItem,
+)
 from backend.app.services.study_service import get_analytics_overview_data
 from backend.app.services.quiz_service import (
     get_weak_topics_list,
     get_mistakes_history,
     get_personalized_recommendations,
 )
+from backend.app.services.revision_service import RevisionService
 
 router = APIRouter()
 
@@ -79,3 +84,13 @@ def get_mistakes(
 @router.get("/recommendations", response_model=List[RecommendationItem], summary="Get personalized practice recommendations")
 def get_recommendations(db: Session = Depends(get_db)):
     return get_personalized_recommendations(db)
+
+
+@router.get("/revision-overview", response_model=RevisionOverviewMetrics, summary="Retrieve spaced revision metrics and KPI overview")
+def get_revision_overview(db: Session = Depends(get_db)):
+    return RevisionService.get_overview_metrics(db)
+
+
+@router.get("/forgetting-risk", response_model=List[ForgettingRiskItem], summary="Analyze forgetting risk distribution across learned topics")
+def get_forgetting_risk(db: Session = Depends(get_db)):
+    return RevisionService.get_forgetting_risk_analysis(db)

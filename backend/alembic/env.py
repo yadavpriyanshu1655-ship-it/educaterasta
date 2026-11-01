@@ -30,6 +30,9 @@ from backend.app.models import (
     AttemptAnswer,
     TopicPerformance,
     TopicPrerequisite,
+    RevisionPlan,
+    RevisionAttempt,
+    RevisionEvent,
 )
 
 # this is the Alembic Config object, which provides

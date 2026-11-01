@@ -43,6 +43,16 @@ import {
   Prerequisite,
   TopicDependencies,
   AdaptiveQuestion,
+  RevisionPlan,
+  RevisionPlanDetail,
+  RevisionAttempt,
+  RevisionAttemptCreateInput,
+  RevisionSnoozeInput,
+  RevisionSkipInput,
+  RevisionEvent,
+  RevisionOverviewMetrics,
+  ForgettingRiskItem,
+  ScheduleRevisionAsSessionInput,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
@@ -497,4 +507,115 @@ export async function deleteTopicPrerequisite(topicId: number, prerequisiteId: n
     method: 'DELETE',
   });
   return handleResponse<void>(res);
+}
+
+// ========================================================
+// PHASE 04: SMART REVISION ENGINE APIS
+// ========================================================
+
+export async function getRevisions(params?: {
+  status?: string;
+  subject_id?: number;
+  risk_category?: string;
+}): Promise<RevisionPlan[]> {
+  const query = new URLSearchParams();
+  if (params?.status) query.append('status', params.status);
+  if (params?.subject_id) query.append('subject_id', String(params.subject_id));
+  if (params?.risk_category) query.append('risk_category', params.risk_category);
+  const qStr = query.toString() ? `?${query.toString()}` : '';
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/revisions${qStr}`);
+  return handleResponse<RevisionPlan[]>(res);
+}
+
+export async function getDueRevisions(): Promise<RevisionPlan[]> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/revisions/due`);
+  return handleResponse<RevisionPlan[]>(res);
+}
+
+export async function getOverdueRevisions(): Promise<RevisionPlan[]> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/revisions/overdue`);
+  return handleResponse<RevisionPlan[]>(res);
+}
+
+export async function generateRevisions(): Promise<{ message: string; created_count: number }> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/revisions/generate`, {
+    method: 'POST',
+  });
+  return handleResponse<{ message: string; created_count: number }>(res);
+}
+
+export async function getRevisionDetail(revisionId: number): Promise<RevisionPlanDetail> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/revisions/${revisionId}`);
+  return handleResponse<RevisionPlanDetail>(res);
+}
+
+export async function completeRevision(
+  revisionId: number,
+  input: RevisionAttemptCreateInput,
+): Promise<RevisionAttempt> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/revisions/${revisionId}/complete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  return handleResponse<RevisionAttempt>(res);
+}
+
+export async function snoozeRevision(
+  revisionId: number,
+  input: RevisionSnoozeInput,
+): Promise<RevisionPlan> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/revisions/${revisionId}/snooze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  return handleResponse<RevisionPlan>(res);
+}
+
+export async function skipRevision(
+  revisionId: number,
+  input: RevisionSkipInput,
+): Promise<RevisionPlan> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/revisions/${revisionId}/skip`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  return handleResponse<RevisionPlan>(res);
+}
+
+export async function getRevisionHistory(topicId?: number, limit: number = 50): Promise<RevisionAttempt[]> {
+  const url = topicId
+    ? `${BASE_URL}${API_PREFIX}/revisions/topics/${topicId}/history?limit=${limit}`
+    : `${BASE_URL}${API_PREFIX}/revisions/history?limit=${limit}`;
+  const res = await fetch(url);
+  return handleResponse<RevisionAttempt[]>(res);
+}
+
+export async function getRevisionEvents(revisionId: number): Promise<RevisionEvent[]> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/revisions/${revisionId}/events`);
+  return handleResponse<RevisionEvent[]>(res);
+}
+
+export async function getRevisionOverview(): Promise<RevisionOverviewMetrics> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/analytics/revision-overview`);
+  return handleResponse<RevisionOverviewMetrics>(res);
+}
+
+export async function getForgettingRisk(): Promise<ForgettingRiskItem[]> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/analytics/forgetting-risk`);
+  return handleResponse<ForgettingRiskItem[]>(res);
+}
+
+export async function scheduleRevisionAsSession(
+  revisionId: number,
+  input: ScheduleRevisionAsSessionInput,
+): Promise<StudySession> {
+  const res = await fetch(`${BASE_URL}${API_PREFIX}/revisions/${revisionId}/schedule-session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  return handleResponse<StudySession>(res);
 }

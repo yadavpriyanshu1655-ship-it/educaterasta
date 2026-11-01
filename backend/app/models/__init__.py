@@ -13,6 +13,11 @@ from backend.app.models.quiz import (
     TopicPerformance,
     TopicPrerequisite,
 )
+from backend.app.models.revision import (
+    RevisionPlan,
+    RevisionAttempt,
+    RevisionEvent,
+)
 
 __all__ = [
     "Subject",
@@ -30,4 +35,7 @@ __all__ = [
     "AttemptAnswer",
     "TopicPerformance",
     "TopicPrerequisite",
+    "RevisionPlan",
+    "RevisionAttempt",
+    "RevisionEvent",
 ]

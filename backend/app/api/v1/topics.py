@@ -31,6 +31,9 @@ def update_topic(topic_id: int, payload: TopicUpdate, db: Session = Depends(get_
         topic.description = payload.description
     if payload.status is not None:
         topic.status = payload.status
+        if payload.status == "completed":
+            from backend.app.services.revision_service import RevisionService
+            RevisionService.sync_eligible_topics(db)
     if payload.priority is not None:
         topic.priority = payload.priority
     if payload.estimated_duration_minutes is not None:

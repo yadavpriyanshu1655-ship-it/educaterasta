@@ -23,4 +23,5 @@ class Subject(Base):
     exams = relationship("Exam", back_populates="subject", cascade="all, delete-orphan")
     quizzes = relationship("Quiz", back_populates="subject", cascade="all, delete-orphan")
     questions = relationship("Question", back_populates="subject", cascade="all, delete-orphan")
+    revision_plans = relationship("RevisionPlan", back_populates="subject", cascade="all, delete-orphan")
 
